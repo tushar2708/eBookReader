@@ -1,29 +1,8 @@
-﻿#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+'''
+Created on Jun 10, 2016
 
-# This file is part of Python EBook Reader.
-#
-# Python EBook Reader is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# Python EBook Reader is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Python EBook Reader; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-
-#Program:	"pythonebookreader"
-#Version: 0.01
-#File:        "reader.py"
-#Date:		26-01-2006 [25-06-2003]
-#Revision: 0.01
-#Author:	willemsh
+@author: tdwivedi
+'''
 
 from __future__ import division
 import sys
@@ -40,7 +19,7 @@ class DefaultOptions(object):
         self.textHeight = 451
         self.leftMarginWidth = 50
         self.topMarginHeight = 50
-        self.fontHeight = 18
+        self.fontHeight = 25
         self.FGCOLOR = 0, 0, 0
         self.BGCOLOR = 255,255,250
         self.pageNumberTop = 500
@@ -57,7 +36,7 @@ class DefaultOptions(object):
         self.lineHeight = 0
         self.configFilePath = "reader.ini"
         self.inifilepath = "bookshelf.ini"
-        self.windowCaption = "pythonebookreader v 0.01"
+        self.windowCaption = "QuadReader v 0.01"
         self.coverImage = "cover.png"
         self.bookshelfImage = "bscover.png"
         self.bookshelfPath = "bookshelf"
@@ -66,19 +45,21 @@ class DefaultOptions(object):
         self.pageIncrement = 1
         self.lastBookRead = 0
         self.skin = 'skin/default'
-        self.copyrightNotice = "Python EBook Reader version 0.01, Copyright (C) 2003-2006 of author\nPython EBook Reader comes with ABSOLUTELY NO WARRANTY; for details\ntype `show w'.  This is free software, and you are welcome\nto redistribute it under certain conditions; type `show c' \nfor details."
+        self.copyrightNotice = "Nothing decided yet"
         
 class Reader(widgets.App):
-    STATE_LOADING = 0
+    STATE_BOOK_SHELF = 0
     STATE_SELECTING = 1
-    STATE_READING = 2
+    STATE_SUMMARY = 2
+    STATE_READING = 3
+    
     def __init__(self, args):
         widgets.App.__init__(self, args)
 
     def onInit(self, args):
         self.bookshelf = []
         self.currentBook = args[1]
-        self.state = self.STATE_LOADING
+        self.state = self.STATE_BOOK_SHELF
         self.options = DefaultOptions()
         self.parseCommandLine()
         self.initOptions()
@@ -247,8 +228,8 @@ class Reader(widgets.App):
                 
     def paginateBook(self, book):
         options = self.options
-        bookPath = options.bookshelfPath +'/' + book.filepath
-        print "bookPath", bookPath
+        bookPath = options.bookshelfPath +'/' + book.filepath + '/' + "text.txt"
+        print "bookPath", bookPath 
         fi = open(bookPath, 'r')
         lines = fi.readlines()
         fi.close()    
@@ -318,18 +299,20 @@ class Reader(widgets.App):
             self.exitNow = True 
             #self.book.lastpageread = self.pageNumber 
             self.end = True
-        elif self.state == self.STATE_LOADING:
+        elif self.state == self.STATE_BOOK_SHELF:
             print "Loading"
+            
             self.bookNumber = self.options.lastBookRead
-            self.image.setSurface(pygame.image.load(self.options.skin + '/' + options.bookshelfImage))
-            self.statusLabel.setText(u"")
-            self.image.show(True)
-            self.lTitle = widgets.Label(self.mainFrame, pygame.Rect(20, 310,0,0), self.bookshelf[self.bookNumber].title, options.normalFont, (234,234,234), 20)
-            self.lAuthor = widgets.Label(self.mainFrame, pygame.Rect(60, 310+ options.lineHeight,0,0), self.bookshelf[self.bookNumber].author, options.normalFont, (234,234,234), 20)
-            self.lTitle.show(True)
-            self.lAuthor.show(True)
-            self.eventManager.post(UpdateRequest())
-            print self.display.views
+            for book in self.bookshelf:
+                self.image.setSurface(pygame.image.load(self.options.skin + '/' + options.bookshelfImage))
+                self.statusLabel.setText(u"")
+                self.image.show(True)
+                self.lTitle = widgets.Label(self.mainFrame, pygame.Rect(20, 310,0,0), book.title, options.normalFont, (234,234,234), 20)
+                self.lAuthor = widgets.Label(self.mainFrame, pygame.Rect(60, 310+ options.lineHeight,0,0), self.bookshelf[self.bookNumber].author, options.normalFont, (234,234,234), 20)
+                self.lTitle.show(True)
+                self.lAuthor.show(True)
+                self.eventManager.post(UpdateRequest())
+                print self.display.views
             self.state = self.STATE_SELECTING
         elif self.state == self.STATE_READING:
             print "Reading"
