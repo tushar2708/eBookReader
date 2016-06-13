@@ -1,17 +1,41 @@
-'''
-Created on Jun 10, 2016
+﻿#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-@author: tdwivedi
-'''
+# This file is part of Python EBook Reader.
+#
+# Python EBook Reader is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# Python EBook Reader is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Python EBook Reader; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+
+#Program:	"pythonebookreader"
+#Version: 0.01
+#File:        "reader.py"
+#Date:		26-01-2006 [25-06-2003]
+#Revision: 0.01
+#Author:	willemsh
 
 from __future__ import division
 import sys
+import decimal
 import pygame
+import Summarize
 from optparse import OptionParser
 from books import *
 from toolkit import *
 from toolkit.events import *
 from pygame.locals import *
+import textrect as tx
 
 class DefaultOptions(object):
     def __init__(self):
@@ -24,6 +48,9 @@ class DefaultOptions(object):
         self.BGCOLOR = 255,255,250
         self.pageNumberTop = 500
         self.fullscreenScreenrect = Rect(0, 0, 1024, 768)
+        self.uperHalfScreenrect = Rect(0, 0, 500, 200)
+        self.lowerHalfScreenrect = Rect(0, 200, 400, 400)
+        self.summary = Rect(5, 260, 390, 300)
         #self.winstyle = FULLSCREEN
         self.winstyle = 0
         self.normalFont = 'berling.ttf'
@@ -47,18 +74,29 @@ class DefaultOptions(object):
         self.skin = 'skin/default'
         self.copyrightNotice = "Nothing decided yet"
         
+        self.bookThumbContainerW = 100
+        self.bookThumbContainerH = 150
+        
+        self.bookThumbMargin = 25;
+        self.bookThumbW = 40;
+        self.bookThumbH = 60;
+        
+        self.bookThumbTitleH = 50
+        self.bookThumbAuthorH = 30;
+        
 class Reader(widgets.App):
-    STATE_BOOK_SHELF = 0
-    STATE_SELECTING = 1
-    STATE_SUMMARY = 2
-    STATE_READING = 3
+    STATE_LOADING = 0
+    STATE_BOOK_SHELF = 1
+    STATE_SELECTING = 2
+    STATE_SUMMARY = 3
+    STATE_READING = 4
     
-    def __init__(self, args):
-        widgets.App.__init__(self, args)
+    def __init__(self):
+        widgets.App.__init__(self)
 
-    def onInit(self, args):
+    def onInit(self):
         self.bookshelf = []
-        self.currentBook = args[1]
+        #self.currentBook = args[1]
         self.state = self.STATE_BOOK_SHELF
         self.options = DefaultOptions()
         self.parseCommandLine()
@@ -183,7 +221,9 @@ class Reader(widgets.App):
         options = self.options
         book = self.bookshelf[self.bookNumber]
         pageNumber = self.pageNumber
+        print "pageNumber", pageNumber
         totalPages = len(book.pages)
+        print "totalPages", totalPages
         page = book.pages[pageNumber]
         size = (options.imgPageWidth,options.imgPageHeight)
         imgPage = pygame.Surface(size, SRCALPHA, 32)
@@ -191,13 +231,18 @@ class Reader(widgets.App):
         #imgPageNumber.fill(options.BGCOLOR)
         #imgPage.blit(imgPageNumber, (int((options.imgPageWidth-imgPageNumber.get_width())/2), options.pageNumberTop))
         imgText = self.renderText(page)
-        imgPageNumber = options.cfont.render(str(pageNumber+1) + "/" + str(len(book.pages)), 1, options.FGCOLOR, options.BGCOLOR)
+        progress = (int(pageNumber)+1)/int(totalPages)
+        remaining_time = book.timeToRead*(1-progress)
+        remaining_time = round(remaining_time,2)
+        print "progress", progress
+        print "remaining_time", remaining_time
+        imgPageNumber = options.cfont.render(str(pageNumber+1) + "/" + str(len(book.pages)) + " : " + str(remaining_time) + " min remaining", 1, options.FGCOLOR, options.BGCOLOR)
         imgTitle = options.cfont.render(book.title, 1, options.FGCOLOR, options.BGCOLOR)
         imgPage.blit(imgText, (options.leftMarginWidth, options.topMarginHeight))
-        progress = (int(pageNumber)+1)/int(totalPages)
-        print "progress", progress
+        
         pygame.draw.rect(imgPage, (128,128,128), pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30),15), 1)
         pygame.draw.rect(imgPage, (0,0,0), pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30)*(progress),15))
+        
         imgPage.blit(imgPageNumber, (int((options.imgPageWidth-imgPageNumber.get_width())/2), options.pageNumberTop))
         #imgPage.blit(imgPageNumber, (int((options.imgPageWidth-imgPageNumber.get_width())/2), options.pageNumberTop))	
         imgPage.blit(imgTitle, (int((options.imgPageWidth - imgTitle.get_width())/2),15))
@@ -300,20 +345,140 @@ class Reader(widgets.App):
             #self.book.lastpageread = self.pageNumber 
             self.end = True
         elif self.state == self.STATE_BOOK_SHELF:
-            print "Loading"
+            print "Book Shelf..."
+            screen = self.initDisplay()
+            summaryText = pygame.Surface((500, 300))
             
+            screen.fill(options.BGCOLOR)
+            pygame.draw.rect(screen, (150, 150, 150), options.uperHalfScreenrect)
+            pygame.draw.rect(screen, (100, 100, 100), options.lowerHalfScreenrect)
+            
+            #self.bookNumber = -1
+            for bookNo in range(3):
+                book = self.bookshelf[bookNo]
+                print book.author
+                color = (255,255,255);
+                book_cover = pygame.image.load(options.bookshelfPath +'/' + book.filepath + '/' + "cover.jpg").convert()
+                book_cover_rect = book_cover.get_rect()
+                book_cover = pygame.transform.scale(book_cover, (options.bookThumbContainerW, options.bookThumbContainerH))
+                book_cover_rect.x = options.bookThumbMargin + (options.bookThumbContainerW + options.bookThumbMargin)*bookNo
+                book_cover_rect.y = options.bookThumbMargin
+                book_cover_rect.width = options.bookThumbContainerW
+                book_cover_rect.height = options.bookThumbContainerH
+                
+                #screen.blit(button,(300,200))
+                #book_cover = pygame.image.load(spaceship).convert_alpha()
+                #pygame.draw.rect(screen, color, [options.bookThumbMargin + (options.bookThumbContainerW + options.bookThumbMargin)*bookNo, options.bookThumbMargin, options.bookThumbContainerW, options.bookThumbContainerH])
+                screen.blit(book_cover, book_cover_rect)
+                pygame.display.flip();
+                
+            if isinstance(event, KeyCommandEvent):
+                index = event.key - pygame.K_1
+                if event.key in (pygame.K_1, pygame.K_2, pygame.K_3): 
+                    self.bookNumber = index
+                    book = self.bookshelf[self.bookNumber]
+                    (summary, timeToRead) = Summarize.main(options.bookshelfPath +'/' + book.filepath + '/' + "text.txt", 10)
+                    book.timeToRead = round(timeToRead,2)
+                    print "*summary*", summary, " : ", "*timeToRead*", book.timeToRead
+                    final_summary = "Estimated time to read : " + str(book.timeToRead) + "\n" + "Summary : " + summary
+                    self.font = pygame.font.SysFont('Arial', 15)
+                    my_rect = pygame.Rect((40, 40, 300, 300))
+                    print "Sumary - len, before truncate", len(summary)
+                    summary = summary[:450] + "..."
+                    print "Sumary - len, after truncate", len(summary)
+    
+                    rendered_title = tx.render_textrect("\'" + book.title + "\' by \'" + book.author +"\'", self.font, Rect(20, 200, 400, 400), (255, 255, 255), (48, 48, 48), 0)
+                    screen.blit(rendered_title, options.lowerHalfScreenrect.topleft)
+                    #screen.blit(self.font.render(book.title + " by " + book.author, True, (48, 48, 48)), (18, 200))
+                    screen.blit(self.font.render("Estimated time to read : " + str(book.timeToRead) + " min", True, (250,150,150)), (0, 220))
+                    #
+                    rendered_sumtitle = tx.render_textrect("Summary :", self.font, Rect(20, 240, 400, 400), (48, 48, 48), (200, 200, 200), 0)
+                    screen.blit(rendered_sumtitle, (0, 240))
+                    
+                    rendered_summary = tx.render_textrect(summary, self.font, options.summary, (60, 60, 60), (230, 230, 230), 0)
+                    
+                    if rendered_summary:
+                        screen.blit(rendered_summary, options.summary.topleft)
+                    #screen.blit(self.font.render(summary, True, (255,0,0)), (40, 200))
+                    pygame.display.flip()
+                    #imgSummary = options.cfont.render(summary, 1, options.FGCOLOR, options.BGCOLOR)
+                    #screen.blit(imgSummary, (int((options.imgPageWidth - imgSummary.get_width())/2),15))
+                    #self.lTitle = widgets.Label(self.mainFrame, pygame.Rect(20, 310,0,0), self.bookshelf[self.bookNumber].title, options.normalFont, (234,234,234), 20)
+                    #self.Summary = widgets.Label(self.mainFrame, pygame.Rect(20, 220, 0, 0), summary, options.normalFont, (234,234,234), 20)
+                    #self.Summary.show(True)
+                    #self.eventManager.post(UpdateRequest())
+                print "key", event.key
+                if event.key == 13:
+                    print "number", self.bookNumber
+                    if self.bookNumber in (0, 1, 2):
+                        self.statusLabel.setText(u"Paginating book...")
+                        self.eventManager.post(UpdateRequest())
+                        self.paginateBook(book)
+                        self.statusLabel.setText(u"Finished Paginating.")
+                        self.eventManager.post(UpdateRequest())
+                        self.pageNumber = int(book.lastpageread) % len(book.pages)
+                        #self.pageNumber = int(book.lastpageread)                    
+                        self.page = self.renderPage()
+                        self.image.setSurface(self.page)
+                        #self.lTitle.show(False)
+                        #self.lAuthor.show(False)
+                        self.statusLabel.show(False)
+                        self.eventManager.post(UpdateRequest())
+
+                        self.end = False
+                        self.exitNow = False
+                        self.state = self.STATE_READING
+                        #return
+                        #self.state = self.STATE_SELECTING
+            
+        elif self.state == self.STATE_LOADING:
+            print "Loading"
             self.bookNumber = self.options.lastBookRead
-            for book in self.bookshelf:
-                self.image.setSurface(pygame.image.load(self.options.skin + '/' + options.bookshelfImage))
-                self.statusLabel.setText(u"")
-                self.image.show(True)
-                self.lTitle = widgets.Label(self.mainFrame, pygame.Rect(20, 310,0,0), book.title, options.normalFont, (234,234,234), 20)
-                self.lAuthor = widgets.Label(self.mainFrame, pygame.Rect(60, 310+ options.lineHeight,0,0), self.bookshelf[self.bookNumber].author, options.normalFont, (234,234,234), 20)
-                self.lTitle.show(True)
-                self.lAuthor.show(True)
-                self.eventManager.post(UpdateRequest())
-                print self.display.views
-            self.state = self.STATE_SELECTING
+            self.image.setSurface(pygame.image.load(self.options.skin + '/' + options.bookshelfImage))
+            self.statusLabel.setText(u"")
+            self.image.show(True)
+            self.lTitle = widgets.Label(self.mainFrame, pygame.Rect(20, 310,0,0), self.bookshelf[self.bookNumber].title, options.normalFont, (234,234,234), 20)
+            self.lAuthor = widgets.Label(self.mainFrame, pygame.Rect(60, 310+options.lineHeight,0,0), self.bookshelf[self.bookNumber].author, options.normalFont, (234,234,234), 20)
+            self.lTitle.show(True)
+            self.lAuthor.show(True)
+            self.eventManager.post(UpdateRequest())
+            print self.display.views
+            #self.state = self.STATE_SELECTING
+            self.state = self.STATE_BOOK_SHELF; # Temporary
+            
+        elif self.state == self.STATE_SELECTING:
+            print "Selecting"
+            bookshelf = self.bookshelf
+            book = self.bookshelf[self.bookNumber]
+            if isinstance(event, KeyCommandEvent):                
+                bookNumber = self.bookNumber
+                if event.key == 275 or event.key == 281:
+                    bookNumber = (bookNumber + 1) % len(bookshelf) 
+                elif event.key == 276 or event.key == 280:
+                    bookNumber = (bookNumber - 1) % len(bookshelf)     
+                elif event.key == 13:
+                    self.statusLabel.setText(u"Paginating book...")
+                    self.eventManager.post(UpdateRequest())
+                    self.paginateBook(book)
+                    self.statusLabel.setText(u"Finished Paginating.")
+                    self.eventManager.post(UpdateRequest())
+                    self.pageNumber = int(book.lastpageread) % len(book.pages)                   
+                    self.page = self.renderPage()
+                    self.image.setSurface(self.page)
+                    self.lTitle.show(False)
+                    self.lAuthor.show(False)
+                    self.statusLabel.show(False)
+                    self.eventManager.post(UpdateRequest())
+
+                    self.end = False
+                    self.exitNow = False
+                    self.state = self.STATE_READING
+                    return
+                self.bookNumber = bookNumber
+                book = self.bookshelf[self.bookNumber]
+                self.lTitle.setText(book.title)
+                self.lAuthor.setText(book.author)
+                self.eventManager.post(UpdateRequest()) 
         elif self.state == self.STATE_READING:
             print "Reading"
             if isinstance(event, KeyCommandEvent):
@@ -331,16 +496,20 @@ class Reader(widgets.App):
                 elif event.key == 276 or event.key == 280:
                     if pageNumber > 0:
                         pageNumber -= options.pageIncrement
+                elif event.key == 273:  # Up key
+                    options.fontHeight += 1
+                elif event.key == 274:  # Down key
+                    options.fontHeight -= 1
                 elif event.key == K_t:
                     options.twoPageView = not options.twoPageView
                     if options.twoPageView:
                         if pageNumber % 2 != 0:
-                            pageNumber -= 1                            
+                            pageNumber -= 1               
                         options.pageIncrement = 2
                     else:
                         options.pageIncrement = 1
                     screen = self.initDisplay()
-                    imgPage.fill(options.BGCOLOR)  
+                    screen.fill(options.BGCOLOR)  
                 elif event.key == K_f: #F key
                     if options.winstyle == FULLSCREEN:
                         options.winstyle = 0
@@ -374,45 +543,13 @@ class Reader(widgets.App):
                     self.image.setSurface(self.page)
                     self.eventManager.post(UpdateRequest())
                     
-        elif self.state == self.STATE_SELECTING:
-            print "Selecting"
-            bookshelf = self.bookshelf
-            book = self.bookshelf[self.bookNumber]
-            if isinstance(event, KeyCommandEvent):                
-                bookNumber = self.bookNumber
-                if event.key == 275 or event.key == 281:
-                        bookNumber = (bookNumber + 1) % len(bookshelf) 
-                elif event.key == 276 or event.key == 280:
-                        bookNumber = (bookNumber - 1) % len(bookshelf) 
-                elif event.key == 13:
-                    self.statusLabel.setText(u"Paginating book...")
-                    self.eventManager.post(UpdateRequest())
-                    self.paginateBook(book)
-                    self.statusLabel.setText(u"Finished Paginating.")
-                    self.eventManager.post(UpdateRequest())
-                    self.pageNumber = int(book.lastpageread) % len(book.pages)                    
-                    self.page = self.renderPage()
-                    self.image.setSurface(self.page)
-                    self.lTitle.show(False)
-                    self.lAuthor.show(False)
-                    self.statusLabel.show(False)
-                    self.eventManager.post(UpdateRequest())
 
-                    self.end = False
-                    self.exitNow = False
-                    self.state = self.STATE_READING
-                    return
-                self.bookNumber = bookNumber
-                book = self.bookshelf[self.bookNumber]
-                self.lTitle.setText(book.title)
-                self.lAuthor.setText(book.author)
-                self.eventManager.post(UpdateRequest()) 
 
 
 def main(args):
     """..."""
     pygame.mixer.quit()
-    test = Reader(args)
+    test = Reader()
     test.run()
 
 

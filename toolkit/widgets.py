@@ -325,14 +325,14 @@ class MovingWindow(Window):
             self.eventManager.post(UpdateRequest())
 
 class App(object):
-    def __init__(self, args):
+    def __init__(self):
         pygame.init()
         self.eventManager = EventManager()
         self.eventManager.registerListener(self)
         self.spinner = CPUSpinnerController(self.eventManager)
         self.keyboard = ConsoleKeyboardController(self.eventManager)
         self.display = None
-        self.onInit(args)
+        self.onInit()
         pass
 
     def onInit(self):
