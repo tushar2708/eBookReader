@@ -240,10 +240,21 @@ class Reader(widgets.App):
         imgTitle = options.cfont.render(book.title, 1, options.FGCOLOR, options.BGCOLOR)
         imgPage.blit(imgText, (options.leftMarginWidth, options.topMarginHeight))
         
-        pygame.draw.rect(imgPage, (128,128,128), pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30),15), 1)
-        pygame.draw.rect(imgPage, (0,0,0), pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30)*(progress),15))
+        '''
+        if (progress <= 0.33):
+            color = (255,60,50)
+        elif (0.33 < progress <= 0.66):
+            color = (255,215,50)
+        else:
+            color = (50,205,50)
+        '''
         
-        imgPage.blit(imgPageNumber, (int((options.imgPageWidth-imgPageNumber.get_width())/2), options.pageNumberTop))
+        color = ((1-progress)*255,progress*255,50)
+        
+        pygame.draw.rect(imgPage, (128,128,128), pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30),10), 1)
+        pygame.draw.rect(imgPage, color, pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30)*(progress),10))
+        
+        imgPage.blit(imgPageNumber, (int((options.imgPageWidth-imgPageNumber.get_width())/2), options.pageNumberTop+12))
         #imgPage.blit(imgPageNumber, (int((options.imgPageWidth-imgPageNumber.get_width())/2), options.pageNumberTop))	
         imgPage.blit(imgTitle, (int((options.imgPageWidth - imgTitle.get_width())/2),15))
         
@@ -312,7 +323,7 @@ class Reader(widgets.App):
                     currentLine += 1
                     awidth = 0
                     #if aheight + 3*LINEHEIGHT > self.height: # new Page
-                    if currentLine+1 > maxlinenumber:
+                    if currentLine+1 >= maxlinenumber:
                         currentPage += 1
                         book.pages.append(Page())				
                         book.pages[currentPage].lines.append(Line())
@@ -321,13 +332,17 @@ class Reader(widgets.App):
                         currentHeight = 0
                     else:
                         book.pages[currentPage].lines.append(Line())
+                #print "current page is %s " %currentPage
+                #print "currentLine is %s" %currentLine         
                 book.pages[currentPage].lines[currentLine].words.append(word)
             book.lastpage = currentPage
         book.isPaginated = True                
 
     def saveIni(self):
         fo = open(self.options.inifilepath, 'w')
+        print "Log the progress in " + self.options.inifilepath
         for book in self.bookshelf:
+            print book
             line = ";".join([book.filepath, book.title, book.author, book.date, str(book.lastpageread)])+ "\n"
             fo.write(line)
         fo.close()
@@ -376,6 +391,7 @@ class Reader(widgets.App):
                 index = event.key - pygame.K_1
                 if event.key in (pygame.K_1, pygame.K_2, pygame.K_3): 
                     self.bookNumber = index
+                    print "index", index
                     book = self.bookshelf[self.bookNumber]
                     (summary, timeToRead) = Summarize.main(options.bookshelfPath +'/' + book.filepath + '/' + "text.txt", 10)
                     book.timeToRead = round(timeToRead,2)
@@ -383,9 +399,9 @@ class Reader(widgets.App):
                     final_summary = "Estimated time to read : " + str(book.timeToRead) + "\n" + "Summary : " + summary
                     self.font = pygame.font.SysFont('Arial', 15)
                     my_rect = pygame.Rect((40, 40, 300, 300))
-                    print "Sumary - len, before truncate", len(summary)
+                    print "Summary - len, before truncate", len(summary)
                     summary = summary[:450] + "..."
-                    print "Sumary - len, after truncate", len(summary)
+                    print "Summary - len, after truncate", len(summary)
     
                     rendered_title = tx.render_textrect("\'" + book.title + "\' by \'" + book.author +"\'", self.font, Rect(20, 200, 400, 400), (255, 255, 255), (48, 48, 48), 0)
                     screen.blit(rendered_title, options.lowerHalfScreenrect.topleft)
@@ -411,11 +427,14 @@ class Reader(widgets.App):
                 if event.key == 13:
                     print "number", self.bookNumber
                     if self.bookNumber in (0, 1, 2):
+                        book = self.bookshelf[self.bookNumber]
                         self.statusLabel.setText(u"Paginating book...")
                         self.eventManager.post(UpdateRequest())
                         self.paginateBook(book)
                         self.statusLabel.setText(u"Finished Paginating.")
                         self.eventManager.post(UpdateRequest())
+                        
+                        print "calculting page number ... book.lastpageread is %s ....book.pages is %s" %(book.lastpageread, len(book.pages))
                         self.pageNumber = int(book.lastpageread) % len(book.pages)
                         #self.pageNumber = int(book.lastpageread)                    
                         self.page = self.renderPage()
@@ -430,6 +449,8 @@ class Reader(widgets.App):
                         self.state = self.STATE_READING
                         #return
                         #self.state = self.STATE_SELECTING
+                    else:
+                        print "boom"
             
         elif self.state == self.STATE_LOADING:
             print "Loading"
@@ -484,6 +505,7 @@ class Reader(widgets.App):
             if isinstance(event, KeyCommandEvent):
                 book = self.bookshelf[self.bookNumber]
                 pageNumber = self.pageNumber
+                book.lastpageread = pageNumber
                 if event.key == 278:
                     pageNumber = 0
                 elif event.key == 279:
@@ -492,7 +514,7 @@ class Reader(widgets.App):
                         pageNumber = pageNumber - 1   
                 elif event.key == 275 or event.key == 281:
                     if pageNumber < (len(book.pages)-1):
-                        pageNumber += options.pageIncrement 
+                        pageNumber += options.pageIncrement
                 elif event.key == 276 or event.key == 280:
                     if pageNumber > 0:
                         pageNumber -= options.pageIncrement
@@ -518,6 +540,9 @@ class Reader(widgets.App):
                         options.twoPageView = False
                         options.pageIncrement = 1
                     screen = self.initDisplay()
+                elif event.key == pygame.K_TAB:
+                    self.saveIni()
+                    self.state = self.STATE_BOOK_SHELF
 
                 if options.winstyle == FULLSCREEN and options.twoPageView:                       
                     pageNumber1 = self.pageNumber - 1

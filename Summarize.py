@@ -190,7 +190,7 @@ class SummaryTool(object):
         #             max_value = sentences_dic[strip_s]
         #             best_sentence = s
 
-        return (".").join(summary)
+        return ("").join(summary)
 
 
     # Build the summary
