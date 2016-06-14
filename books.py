@@ -53,7 +53,7 @@ class Book:
         self.title = title
         self.author = author
         self.date = date
-        self.lastpageread= lastpageread
+        self.lastpageread= int(lastpageread)
         self.lastFontSize = int(lastFontSize)
         self.filepath = filepath
         self.width = width

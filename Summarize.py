@@ -211,7 +211,7 @@ class SummaryTool(object):
             if sentence:
                 summary.append(sentence)
 
-        return (".").join(summary)
+        return ("").join(summary)
 
     # def get_keyword_list(self, summary):
     #     sentences = self.split_content_to_sentences_on_fullspot(summary)
@@ -259,10 +259,10 @@ class SummaryTool(object):
         print "numSyllables %s" % numSyllables
         print "numSentences %s" %numSentences
         time_to_read =  (avg_time_syllable * numSyllables + avg_time_word * numWords + avg_time_sentence *  numSentences)/60000
-        return time_to_read
+        return (numWords, time_to_read)
 		
 # Main method, just run "python summary_tool.py"
-def main(filepath, summarypercent):
+def main(content, summarypercent, needSummary):
 
     # Demo
     # Content from: "http://thenextweb.com/apps/2013/03/21/swayy-discover-curate-content/"
@@ -271,23 +271,26 @@ def main(filepath, summarypercent):
    # Swayy is a beautiful new dashboard for discovering and curating online content [Invites]
    # """
 
-    file = open(filepath, 'r')
-    content = file.read()
+    #file = open(filepath, 'r')
+    #content = file.read()
 
     title = ""
     # Create a SummaryTool object
     st = SummaryTool()
 
     #calculate time to read
-    time = st.calculate_time_to_read(content)
-	
-    # Build the sentences dictionary
-    sentences_dic = st.get_senteces_ranks_new(content)
+    (words, time) = st.calculate_time_to_read(content)
 
-    # Build the summary with the sentences dictionary
-    summary = st.get_new_summary(title, content, sentences_dic,int(summarypercent))
+    if needSummary:
+        # Build the sentences dictionary
+        sentences_dic = st.get_senteces_ranks_new(content)
+        # Build the summary with the sentences dictionary
+        summary = st.get_new_summary(title, content, sentences_dic,int(summarypercent))
+        return (time, words, summary)
+    else :
+        return (time, words)
     
-    return (summary, time)
+    
 
 '''
     # Print the summary

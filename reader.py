@@ -361,15 +361,19 @@ class Reader(widgets.App):
         rendered_title = tx.render_textrect("\'" + book.title + "\' by \'" + book.author +"\'", self.font, Rect(20, 200, 400, 400), (255, 255, 255), (48, 48, 48), 0)
         screen.blit(rendered_title, options.lowerHalfScreenrect.topleft)
         
+        file = open(options.bookshelfPath +'/' + book.filepath + '/' + "text.txt", 'r')
+        content = file.read()
 
-        (self.summary, timeToRead) = Summarize.main(options.bookshelfPath +'/' + book.filepath + '/' + "text.txt", 20)
+        (timeToRead, numWords, self.summary) = Summarize.main(content, 15, needSummary=True)
         book.timeToRead = round(timeToRead,2)
         self.summary = self.summary[:650] + "..."
         print "*summary*", self.summary, " : ", "*timeToRead*", book.timeToRead
         
-        screen.blit(self.font.render("Estimated time to read : " + str(book.timeToRead) + " min", True, (250,150,150)), (0, 220))
         
-        rendered_sumtitle = tx.render_textrect("Summary :", self.font, Rect(20, 240, 400, 400), (48, 48, 48), (200, 200, 200), 0)
+        
+        screen.blit(self.font.render("Total time : " + str(book.timeToRead) + " min", True, (250,150,150)), (0, 220))
+        
+        rendered_sumtitle = tx.render_textrect("Summary (There were " + str(numWords) + " words in actual document)", self.font, Rect(20, 240, 400, 400), (48, 48, 48), (200, 200, 200), 0)
         screen.blit(rendered_sumtitle, (0, 240))
         
         rendered_summary = tx.render_textrect(self.summary, self.font, options.summary, (60, 60, 60), (230, 230, 230), 0)
