@@ -1,31 +1,7 @@
 ﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-# This file is part of Python EBook Reader.
-#
-# Python EBook Reader is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# Python EBook Reader is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Python EBook Reader; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-
-#Program:	"pythonebookreader"
-#Version: 0.01
-#File:        "reader.py"
-#Date:		26-01-2006 [25-06-2003]
-#Revision: 0.01
-#Author:	willemsh
-
 from __future__ import division
+import os
 import sys
 import decimal
 import pygame
@@ -43,7 +19,7 @@ class DefaultOptions(object):
         self.textHeight = 451
         self.leftMarginWidth = 50
         self.topMarginHeight = 50
-        self.fontHeight = 25
+        self.fontHeight = 22
         self.FGCOLOR = 0, 0, 0
         self.BGCOLOR = 255,255,250
         self.pageNumberTop = 500
@@ -71,7 +47,7 @@ class DefaultOptions(object):
         self.twoPageView = True
         self.pageIncrement = 1
         self.lastBookRead = 0
-        self.skin = 'skin/default'
+        self.skin = 'skin/default/'
         self.copyrightNotice = "Nothing decided yet"
         
         self.bookThumbContainerW = 100
@@ -100,6 +76,8 @@ class Reader(widgets.App):
         self.state = self.STATE_BOOK_SHELF
         self.options = DefaultOptions()
         self.parseCommandLine()
+        self.loadPrefs()
+        self.readIni()
         self.initOptions()
         self.display = widgets.Display(self.eventManager, self.options.screenrect)
         self.display.canvas = self.initDisplay()
@@ -115,9 +93,6 @@ class Reader(widgets.App):
         self.statusLabel.show(True)
         self.display.addView(self.mainFrame)
         self.eventManager.post(UpdateRequest())
-        
-        self.loadPrefs()
-        self.readIni()
 
         self.eventManager.post(FinishedLoadingEvent())
 
@@ -131,13 +106,19 @@ class Reader(widgets.App):
         parser.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="don't print status messages to stdout")
         (options, args) = parser.parse_args()
         
-    def initOptions(self):
-        options = self.options
+    def initOptions(self, fontHeight = -1):
+        
+        if (fontHeight == -1):
+            fontHeight = self.options.fontHeight
+        else:
+            self.options.fontHeight = fontHeight
+            
+        options = self.options        
         if options.winstyle == FULLSCREEN:           
             options.screenrect = options.fullscreenScreenrect
             options.imgPageWidth = options.textWidth + (2*options.leftMarginWidth)
             options.imgPageHeight = options.textHeight + (2*options.topMarginHeight)
-            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-options.fontHeight)/2)
+            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-fontHeight)/2)
             left = int( ( options.screenrect.width - ( options.textWidth + ( 2*options.leftMarginWidth ) ) )/2 )
             top = int( (options.screenrect.height-(options.textHeight+(2*options.topMarginHeight)))/2 )
             options.firstPagePos = (left, top)
@@ -149,13 +130,13 @@ class Reader(widgets.App):
         else:       
             options.imgPageWidth = options.textWidth + (2*options.leftMarginWidth)
             options.imgPageHeight = options.textHeight + (2*options.topMarginHeight)
-            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-options.fontHeight)/2)
+            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-fontHeight)/2)
             options.screenrect = Rect(0, 0, options.imgPageWidth, options.imgPageHeight)
             options.firstPagePos = (0,0)
             pygame.mouse.set_visible(True)
 
-        options.font = pygame.font.Font(pygame.font.match_font(options.normalFont), options.fontHeight)        
-        options.cfont = pygame.font.Font(pygame.font.match_font(options.decorFont), options.fontHeight-2)     
+        options.font = pygame.font.Font(pygame.font.match_font(options.normalFont), fontHeight)        
+        options.cfont = pygame.font.Font(pygame.font.match_font(options.decorFont), fontHeight-2)     
         options.defaultfont = pygame.font.Font(pygame.font.get_default_font(), 20)
         options.spaceWidth = options.font.size(" ")[0]
         options.lineHeight = options.font.size(" ")[1]
@@ -174,8 +155,8 @@ class Reader(widgets.App):
         fi.close()
         for line in lines:
             if line.strip() != "":
-                (filepath, title, author, date, lastPageRead) = line.strip().split(";")
-                book = Book(filepath, title, author, date, lastPageRead)
+                (filepath, title, author, date, lastPageRead, lastFontSize) = line.strip().split(";")
+                book = Book(filepath, title, author, date, lastPageRead, lastFontSize)
                 self.bookshelf.append(book)
         print self.bookshelf
 
@@ -343,9 +324,61 @@ class Reader(widgets.App):
         print "Log the progress in " + self.options.inifilepath
         for book in self.bookshelf:
             print book
-            line = ";".join([book.filepath, book.title, book.author, book.date, str(book.lastpageread)])+ "\n"
+            line = ";".join([book.filepath, book.title, book.author, book.date, str(book.lastpageread), str(book.lastFontSize)])+ "\n"
             fo.write(line)
         fo.close()
+
+    def showBook(self):
+        book = self.bookshelf[self.bookNumber]
+        self.initOptions(book.lastFontSize)
+        self.statusLabel.setText(u"Paginating book...")
+        self.eventManager.post(UpdateRequest())
+        self.paginateBook(book)
+        self.statusLabel.setText(u"Finished Paginating.")
+        self.eventManager.post(UpdateRequest())
+        
+        print "calculting page number ... book.lastpageread is %s ....book.pages is %s" %(book.lastpageread, len(book.pages))
+        self.pageNumber = int(book.lastpageread) % len(book.pages)
+        #self.pageNumber = int(book.lastpageread)                    
+        self.page = self.renderPage()
+        self.image.setSurface(self.page)
+        #self.lTitle.show(False)
+        #self.lAuthor.show(False)
+        self.statusLabel.show(False)
+        self.eventManager.post(UpdateRequest())
+
+        self.end = False
+        self.exitNow = False
+        self.state = self.STATE_READING
+
+    def showBookDetails(self, screen, options):
+        self.bookNumber = self.index
+        print "index", self.index
+        book = self.bookshelf[self.bookNumber]
+        
+        self.font = pygame.font.SysFont('Arial', 15)
+        
+        rendered_title = tx.render_textrect("\'" + book.title + "\' by \'" + book.author +"\'", self.font, Rect(20, 200, 400, 400), (255, 255, 255), (48, 48, 48), 0)
+        screen.blit(rendered_title, options.lowerHalfScreenrect.topleft)
+        
+
+        (self.summary, timeToRead) = Summarize.main(options.bookshelfPath +'/' + book.filepath + '/' + "text.txt", 20)
+        book.timeToRead = round(timeToRead,2)
+        self.summary = self.summary[:650] + "..."
+        print "*summary*", self.summary, " : ", "*timeToRead*", book.timeToRead
+        
+        screen.blit(self.font.render("Estimated time to read : " + str(book.timeToRead) + " min", True, (250,150,150)), (0, 220))
+        
+        rendered_sumtitle = tx.render_textrect("Summary :", self.font, Rect(20, 240, 400, 400), (48, 48, 48), (200, 200, 200), 0)
+        screen.blit(rendered_sumtitle, (0, 240))
+        
+        rendered_summary = tx.render_textrect(self.summary, self.font, options.summary, (60, 60, 60), (230, 230, 230), 0)
+        
+        if rendered_summary:
+            screen.blit(rendered_summary, options.summary.topleft)
+
+        #screen.blit(self.font.render(summary, True, (255,0,0)), (40, 200))
+        pygame.display.flip()
 
     def notify(self, event):
         #print "Notify"
@@ -388,35 +421,9 @@ class Reader(widgets.App):
                 pygame.display.flip();
                 
             if isinstance(event, KeyCommandEvent):
-                index = event.key - pygame.K_1
+                self.index = event.key - pygame.K_1
                 if event.key in (pygame.K_1, pygame.K_2, pygame.K_3): 
-                    self.bookNumber = index
-                    print "index", index
-                    book = self.bookshelf[self.bookNumber]
-                    (summary, timeToRead) = Summarize.main(options.bookshelfPath +'/' + book.filepath + '/' + "text.txt", 10)
-                    book.timeToRead = round(timeToRead,2)
-                    print "*summary*", summary, " : ", "*timeToRead*", book.timeToRead
-                    final_summary = "Estimated time to read : " + str(book.timeToRead) + "\n" + "Summary : " + summary
-                    self.font = pygame.font.SysFont('Arial', 15)
-                    my_rect = pygame.Rect((40, 40, 300, 300))
-                    print "Summary - len, before truncate", len(summary)
-                    summary = summary[:450] + "..."
-                    print "Summary - len, after truncate", len(summary)
-    
-                    rendered_title = tx.render_textrect("\'" + book.title + "\' by \'" + book.author +"\'", self.font, Rect(20, 200, 400, 400), (255, 255, 255), (48, 48, 48), 0)
-                    screen.blit(rendered_title, options.lowerHalfScreenrect.topleft)
-                    #screen.blit(self.font.render(book.title + " by " + book.author, True, (48, 48, 48)), (18, 200))
-                    screen.blit(self.font.render("Estimated time to read : " + str(book.timeToRead) + " min", True, (250,150,150)), (0, 220))
-                    #
-                    rendered_sumtitle = tx.render_textrect("Summary :", self.font, Rect(20, 240, 400, 400), (48, 48, 48), (200, 200, 200), 0)
-                    screen.blit(rendered_sumtitle, (0, 240))
-                    
-                    rendered_summary = tx.render_textrect(summary, self.font, options.summary, (60, 60, 60), (230, 230, 230), 0)
-                    
-                    if rendered_summary:
-                        screen.blit(rendered_summary, options.summary.topleft)
-                    #screen.blit(self.font.render(summary, True, (255,0,0)), (40, 200))
-                    pygame.display.flip()
+                    self.showBookDetails(screen, options)
                     #imgSummary = options.cfont.render(summary, 1, options.FGCOLOR, options.BGCOLOR)
                     #screen.blit(imgSummary, (int((options.imgPageWidth - imgSummary.get_width())/2),15))
                     #self.lTitle = widgets.Label(self.mainFrame, pygame.Rect(20, 310,0,0), self.bookshelf[self.bookNumber].title, options.normalFont, (234,234,234), 20)
@@ -427,26 +434,7 @@ class Reader(widgets.App):
                 if event.key == 13:
                     print "number", self.bookNumber
                     if self.bookNumber in (0, 1, 2):
-                        book = self.bookshelf[self.bookNumber]
-                        self.statusLabel.setText(u"Paginating book...")
-                        self.eventManager.post(UpdateRequest())
-                        self.paginateBook(book)
-                        self.statusLabel.setText(u"Finished Paginating.")
-                        self.eventManager.post(UpdateRequest())
-                        
-                        print "calculting page number ... book.lastpageread is %s ....book.pages is %s" %(book.lastpageread, len(book.pages))
-                        self.pageNumber = int(book.lastpageread) % len(book.pages)
-                        #self.pageNumber = int(book.lastpageread)                    
-                        self.page = self.renderPage()
-                        self.image.setSurface(self.page)
-                        #self.lTitle.show(False)
-                        #self.lAuthor.show(False)
-                        self.statusLabel.show(False)
-                        self.eventManager.post(UpdateRequest())
-
-                        self.end = False
-                        self.exitNow = False
-                        self.state = self.STATE_READING
+                        self.showBook()
                         #return
                         #self.state = self.STATE_SELECTING
                     else:
@@ -519,9 +507,13 @@ class Reader(widgets.App):
                     if pageNumber > 0:
                         pageNumber -= options.pageIncrement
                 elif event.key == 273:  # Up key
-                    options.fontHeight += 1
+                    book.lastFontSize += 2
+                    self.saveIni()
+                    self.showBook()
                 elif event.key == 274:  # Down key
-                    options.fontHeight -= 1
+                    book.lastFontSize -= 2
+                    self.saveIni()
+                    self.showBook()
                 elif event.key == K_t:
                     options.twoPageView = not options.twoPageView
                     if options.twoPageView:

@@ -49,11 +49,12 @@ class Page:
         self.lines = []	
 
 class Book:
-    def __init__(self, filepath, title, author, date, lastpageread, width=300, height=400):
+    def __init__(self, filepath, title, author, date, lastpageread, lastFontSize, width=300, height=400):
         self.title = title
         self.author = author
         self.date = date
         self.lastpageread= lastpageread
+        self.lastFontSize = int(lastFontSize)
         self.filepath = filepath
         self.width = width
         self.height = height
