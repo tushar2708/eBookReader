@@ -19,7 +19,6 @@ class DefaultOptions(object):
         self.textHeight = 451
         self.leftMarginWidth = 50
         self.topMarginHeight = 50
-        self.fontHeight = 22
         self.FGCOLOR = 0, 0, 0
         self.BGCOLOR = 255,255,250
         self.pageNumberTop = 500
@@ -106,19 +105,19 @@ class Reader(widgets.App):
         parser.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="don't print status messages to stdout")
         (options, args) = parser.parse_args()
         
-    def initOptions(self, fontHeight = -1):
+    def initOptions(self, bookFontPref = -1):
         
-        if (fontHeight == -1):
-            fontHeight = self.options.fontHeight
+        if (self.options.userFontSizePref == -1):
+            self.options.fontHeight = bookFontPref if (bookFontPref != -1) else 22
         else:
-            self.options.fontHeight = fontHeight
+            self.options.fontHeight = self.options.userFontSizePref
             
         options = self.options        
         if options.winstyle == FULLSCREEN:           
             options.screenrect = options.fullscreenScreenrect
             options.imgPageWidth = options.textWidth + (2*options.leftMarginWidth)
             options.imgPageHeight = options.textHeight + (2*options.topMarginHeight)
-            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-fontHeight)/2)
+            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-self.options.fontHeight)/2)
             left = int( ( options.screenrect.width - ( options.textWidth + ( 2*options.leftMarginWidth ) ) )/2 )
             top = int( (options.screenrect.height-(options.textHeight+(2*options.topMarginHeight)))/2 )
             options.firstPagePos = (left, top)
@@ -130,13 +129,13 @@ class Reader(widgets.App):
         else:       
             options.imgPageWidth = options.textWidth + (2*options.leftMarginWidth)
             options.imgPageHeight = options.textHeight + (2*options.topMarginHeight)
-            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-fontHeight)/2)
+            options.pageNumberTop = options.textHeight + options.topMarginHeight + int((options.topMarginHeight-self.options.fontHeight)/2)
             options.screenrect = Rect(0, 0, options.imgPageWidth, options.imgPageHeight)
             options.firstPagePos = (0,0)
             pygame.mouse.set_visible(True)
 
-        options.font = pygame.font.Font(pygame.font.match_font(options.normalFont), fontHeight)        
-        options.cfont = pygame.font.Font(pygame.font.match_font(options.decorFont), fontHeight-2)     
+        options.font = pygame.font.Font(pygame.font.match_font(options.normalFont), self.options.fontHeight)        
+        options.cfont = pygame.font.Font(pygame.font.match_font(options.decorFont), self.options.fontHeight-2)     
         options.defaultfont = pygame.font.Font(pygame.font.get_default_font(), 20)
         options.spaceWidth = options.font.size(" ")[0]
         options.lineHeight = options.font.size(" ")[1]
@@ -155,10 +154,60 @@ class Reader(widgets.App):
         fi.close()
         for line in lines:
             if line.strip() != "":
-                (filepath, title, author, date, lastPageRead, lastFontSize) = line.strip().split(";")
-                book = Book(filepath, title, author, date, lastPageRead, lastFontSize)
+                (filepath, title, author, date, lastPageRead, bookFontSize) = line.strip().split(";")
+                book = Book(filepath, title, author, date, lastPageRead, bookFontSize)
                 self.bookshelf.append(book)
         print self.bookshelf
+
+    def saveIni(self):
+        fo = open(self.options.inifilepath, 'w')
+        print "Log the progress in " + self.options.inifilepath
+        for book in self.bookshelf:
+            print book
+            line = ";".join([book.filepath, book.title, book.author, book.date, str(book.lastpageread), str(book.bookFontSize)])+ "\n"
+            fo.write(line)
+        fo.close()
+
+            
+    def loadPrefs(self):
+        options = self.options
+        fi = open(self.options.configFilePath, 'r')
+        lines = fi.readlines()
+        for line in lines:
+            (key, value)=line.strip().split("=")
+            if key == "titleFont":
+                options.titleFont = str(value)
+            if key == "bookFont":
+                options.bookFont = str(value)
+            if key == "lastBookRead":
+                options.lastBookRead = int(value)
+            if key == "fullscreen":
+                options.fullscreen = bool(value)
+            if key == "twoPageView":
+                options.twoPageView = bool(value)
+            if key == "bookshelfPath":
+                options.bookshelfPath = str(value)
+            if key == "userFontSizePref":
+                options.userFontSizePref = int(value)
+            print key, value
+
+    def savePrefs(self):
+        options = self.options
+        fo = open(self.options.configFilePath, 'w')
+        
+        print "Log the progress in " + self.options.inifilepath
+        line=""
+        line += "titleFont=" + str(options.titleFont) + "\n"
+        line += "bookFont=" + str(options.bookFont) + "\n"
+        line += "lastBookRead=" + str(options.lastBookRead) + "\n"
+        line += "fullscreen=" + str(options.fullscreen) + "\n"
+        line += "twoPageView=" + str(options.twoPageView) + "\n"
+        line += "bookshelfPath=" + str(options.bookshelfPath) + "\n"
+        line += "userFontSizePref=" + str(options.userFontSizePref) + "\n"
+        
+        
+        fo.write(line)
+        fo.close()
 
     def renderLine(self, line):
         #print "Rendering:", line.words
@@ -242,27 +291,7 @@ class Reader(widgets.App):
         #pygame.image.save(imgPage, "t.bmp")
         return imgPage
 
-            
-    def loadPrefs(self):
-        options = self.options
-        fi = open(self.options.configFilePath, 'r')
-        lines = fi.readlines()
-        for line in lines:
-            (key, value)=line.strip().split("=")
-            if key == "titleFont":
-                options.titleFont = str(value)
-            if key == "bookFont":
-                options.bookFont = str(value)
-            if key == "lastBookRead":
-                options.lastBookRead = int(value)
-            if key == "fullscreen":
-                options.fullscreen = bool(value)
-            if key == "twoPageView":
-                options.twoPageView = bool(value)
-            if key == "bookshelfPath":
-                options.bookshelfPath = str(value)
-            print key, value
-                
+    
     def paginateBook(self, book):
         options = self.options
         bookPath = options.bookshelfPath +'/' + book.filepath + '/' + "text.txt"
@@ -319,18 +348,9 @@ class Reader(widgets.App):
             book.lastpage = currentPage
         book.isPaginated = True                
 
-    def saveIni(self):
-        fo = open(self.options.inifilepath, 'w')
-        print "Log the progress in " + self.options.inifilepath
-        for book in self.bookshelf:
-            print book
-            line = ";".join([book.filepath, book.title, book.author, book.date, str(book.lastpageread), str(book.lastFontSize)])+ "\n"
-            fo.write(line)
-        fo.close()
-
     def showBook(self):
         book = self.bookshelf[self.bookNumber]
-        self.initOptions(book.lastFontSize)
+        self.initOptions(book.bookFontSize)
         self.statusLabel.setText(u"Paginating book...")
         self.eventManager.post(UpdateRequest())
         self.paginateBook(book)
@@ -364,12 +384,10 @@ class Reader(widgets.App):
         file = open(options.bookshelfPath +'/' + book.filepath + '/' + "text.txt", 'r')
         content = file.read()
 
-        (timeToRead, numWords, self.summary) = Summarize.main(content, 15, needSummary=True)
+        (timeToRead, numWords, self.summary) = Summarize.main(content, 10, needSummary=True)
         book.timeToRead = round(timeToRead,2)
         self.summary = self.summary[:650] + "..."
         print "*summary*", self.summary, " : ", "*timeToRead*", book.timeToRead
-        
-        
         
         screen.blit(self.font.render("Total time : " + str(book.timeToRead) + " min", True, (250,150,150)), (0, 220))
         
@@ -443,6 +461,9 @@ class Reader(widgets.App):
                         #self.state = self.STATE_SELECTING
                     else:
                         print "boom"
+                if event.key == pygame.K_c:
+                    options.userFontSizePref = -1
+                    self.savePrefs()
             
         elif self.state == self.STATE_LOADING:
             print "Loading"
@@ -511,12 +532,16 @@ class Reader(widgets.App):
                     if pageNumber > 0:
                         pageNumber -= options.pageIncrement
                 elif event.key == 273:  # Up key
-                    book.lastFontSize += 2
+                    options.fontHeight += 1
+                    options.userFontSizePref = options.fontHeight
                     self.saveIni()
+                    self.savePrefs()
                     self.showBook()
                 elif event.key == 274:  # Down key
-                    book.lastFontSize -= 2
+                    options.fontHeight -= 1
+                    options.userFontSizePref = options.fontHeight
                     self.saveIni()
+                    self.savePrefs()
                     self.showBook()
                 elif event.key == K_t:
                     options.twoPageView = not options.twoPageView
