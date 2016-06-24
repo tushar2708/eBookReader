@@ -279,7 +279,7 @@ class Reader(widgets.App):
             color = (50,205,50)
         '''
         
-        color = ((1-progress)*255,progress*255,50)
+        color = ((1-progress)*255,progress*255,200)
         
         pygame.draw.rect(imgPage, (128,128,128), pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30),10), 1)
         pygame.draw.rect(imgPage, color, pygame.Rect(15,options.pageNumberTop-1,(options.imgPageWidth-30)*(progress),10))
